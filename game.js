@@ -7,143 +7,86 @@ const restartBtn = document.querySelector('#restart');
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87ceeb);
-scene.fog = new THREE.Fog(0x87ceeb, 35, 110);
+scene.fog = new THREE.Fog(0x87ceeb, 30, 90);
 
-const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 250);
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 200);
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-const hemi = new THREE.HemisphereLight(0xffffff, 0x4f6d57, 0.85);
+const hemi = new THREE.HemisphereLight(0xffffff, 0x446655, 0.9);
 scene.add(hemi);
 
-const sun = new THREE.DirectionalLight(0xffffff, 1.2);
-sun.position.set(20, 34, 12);
+const sun = new THREE.DirectionalLight(0xffffff, 1.15);
+sun.position.set(15, 35, 10);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
-sun.shadow.camera.left = -42;
-sun.shadow.camera.right = 42;
-sun.shadow.camera.top = 42;
-sun.shadow.camera.bottom = -42;
+sun.shadow.camera.left = -35;
+sun.shadow.camera.right = 35;
+sun.shadow.camera.top = 35;
+sun.shadow.camera.bottom = -35;
 scene.add(sun);
 
 const LANE_SIZE = 4;
 const HALF_WIDTH = 18;
+const LANE_COUNT = 45;
 const MOVE_TIME = 0.14;
-const AHEAD_BUFFER = 34;
-const BEHIND_BUFFER = 8;
 
-const laneColors = {
-  grass: 0x78c964,
-  road: 0x2a3038,
-  water: 0x3d95d8,
-};
-
-const lanes = new Map();
-let highestLaneGenerated = -1;
+const lanes = [];
+const cars = [];
 let maxLaneReached = 0;
 let alive = true;
 
+const laneColors = {
+  grass: 0x7cc768,
+  road: 0x2c3138,
+  water: 0x3f9be0,
+};
+
 const groundGeo = new THREE.BoxGeometry(HALF_WIDTH * 2, 1, LANE_SIZE);
-const roadLineGeo = new THREE.BoxGeometry(HALF_WIDTH * 1.8, 0.03, 0.16);
-
-function makeVehicle(index, direction, speedBase) {
-  const car = new THREE.Mesh(
-    new THREE.BoxGeometry(2.6, 1.25, 1.9),
-    new THREE.MeshStandardMaterial({ color: new THREE.Color().setHSL(Math.random(), 0.68, 0.5) })
-  );
-  car.castShadow = true;
-  car.position.set(-HALF_WIDTH + Math.random() * HALF_WIDTH * 2, 0.65, index * LANE_SIZE);
-  scene.add(car);
-
-  return {
-    mesh: car,
-    speed: (speedBase + Math.random() * 1.8) * direction,
-    halfX: 1.3,
-  };
-}
-
-function makeLog(index, direction, speedBase) {
-  const length = 3.5 + Math.random() * 2.8;
-  const log = new THREE.Mesh(
-    new THREE.BoxGeometry(length, 0.8, 2.4),
-    new THREE.MeshStandardMaterial({ color: 0x8f5e34, roughness: 0.92 })
-  );
-  log.castShadow = true;
-  log.receiveShadow = true;
-  log.position.set(-HALF_WIDTH + Math.random() * HALF_WIDTH * 2, 0.35, index * LANE_SIZE);
-  scene.add(log);
-
-  return {
-    mesh: log,
-    speed: (speedBase + Math.random() * 1.1) * direction,
-    halfX: length * 0.5,
-  };
-}
 
 function createLane(index) {
-  const roll = Math.random();
-  const type = index < 2 ? 'grass' : roll < 0.46 ? 'road' : roll < 0.76 ? 'grass' : 'water';
+  const typeRoll = Math.random();
+  const type = index < 2 ? 'grass' : typeRoll < 0.5 ? 'road' : typeRoll < 0.82 ? 'grass' : 'water';
 
-  const laneMesh = new THREE.Mesh(
+  const lane = new THREE.Mesh(
     groundGeo,
     new THREE.MeshStandardMaterial({ color: laneColors[type] })
   );
-  laneMesh.position.set(0, -0.5, index * LANE_SIZE);
-  laneMesh.receiveShadow = true;
-  scene.add(laneMesh);
+  lane.position.set(0, -0.5, index * LANE_SIZE);
+  lane.receiveShadow = true;
+  lane.userData.type = type;
+  scene.add(lane);
 
-  const lane = {
-    index,
-    type,
-    mesh: laneMesh,
-    movers: [],
-    direction: 1,
-  };
+  lanes[index] = lane;
 
   if (type === 'road') {
-    const lines = new THREE.Mesh(roadLineGeo, new THREE.MeshStandardMaterial({ color: 0xf7f2c0 }));
-    lines.position.set(0, 0.02, index * LANE_SIZE);
-    scene.add(lines);
-    lane.roadLine = lines;
+    const carCount = 2 + Math.floor(Math.random() * 3);
+    const direction = Math.random() > 0.5 ? 1 : -1;
 
-    const count = 2 + Math.floor(Math.random() * 3);
-    const direction = Math.random() < 0.5 ? -1 : 1;
-    lane.direction = direction;
+    for (let i = 0; i < carCount; i += 1) {
+      const car = new THREE.Mesh(
+        new THREE.BoxGeometry(2.6, 1.25, 1.9),
+        new THREE.MeshStandardMaterial({ color: new THREE.Color().setHSL(Math.random(), 0.65, 0.5) })
+      );
+      car.castShadow = true;
+      car.position.y = 0.6;
+      car.position.z = index * LANE_SIZE;
+      car.position.x = -HALF_WIDTH + i * 12 + Math.random() * 5;
 
-    for (let i = 0; i < count; i += 1) lane.movers.push(makeVehicle(index, direction, 2.6));
-  }
-
-  if (type === 'water') {
-    const count = 2 + Math.floor(Math.random() * 2);
-    const direction = Math.random() < 0.5 ? -1 : 1;
-    lane.direction = direction;
-
-    for (let i = 0; i < count; i += 1) lane.movers.push(makeLog(index, direction, 1.5));
-  }
-
-  lanes.set(index, lane);
-  highestLaneGenerated = Math.max(highestLaneGenerated, index);
-}
-
-function ensureLanesAround(playerLane) {
-  const targetMax = playerLane + AHEAD_BUFFER;
-  while (highestLaneGenerated < targetMax) createLane(highestLaneGenerated + 1);
-
-  const minKeep = Math.max(0, playerLane - BEHIND_BUFFER);
-  for (const [index, lane] of lanes.entries()) {
-    if (index < minKeep) {
-      scene.remove(lane.mesh);
-      if (lane.roadLine) scene.remove(lane.roadLine);
-      for (const mover of lane.movers) scene.remove(mover.mesh);
-      lanes.delete(index);
+      scene.add(car);
+      cars.push({
+        mesh: car,
+        lane: index,
+        speed: (3 + Math.random() * 2.2) * direction,
+      });
     }
   }
 }
 
-for (let i = 0; i <= AHEAD_BUFFER; i += 1) createLane(i);
+for (let i = 0; i < LANE_COUNT; i += 1) createLane(i);
 
 const player = new THREE.Group();
 
@@ -180,12 +123,10 @@ let targetX = 0;
 let targetLane = 0;
 let moving = false;
 let moveProgress = 0;
-const startPos = new THREE.Vector3();
-const endPos = new THREE.Vector3();
+let startPos = new THREE.Vector3();
+let endPos = new THREE.Vector3();
 
-function laneLimit() {
-  return highestLaneGenerated;
-}
+const keys = new Set();
 
 function startMove(dx, dz) {
   if (!alive || moving) return;
@@ -193,7 +134,7 @@ function startMove(dx, dz) {
   const nextX = targetX + dx * LANE_SIZE;
   const nextLane = targetLane + dz;
 
-  if (Math.abs(nextX) > HALF_WIDTH - 2 || nextLane < 0 || nextLane > laneLimit()) return;
+  if (Math.abs(nextX) > HALF_WIDTH - 2 || nextLane < 0 || nextLane >= LANESafeEnd()) return;
 
   targetX = nextX;
   targetLane = nextLane;
@@ -203,93 +144,45 @@ function startMove(dx, dz) {
   endPos.set(targetX, 0, targetLane * LANE_SIZE);
 }
 
+function LANESafeEnd() {
+  return LANE_COUNT - 1;
+}
+
 window.addEventListener('keydown', (event) => {
+  keys.add(event.code);
+
   if (event.code === 'ArrowUp' || event.code === 'KeyW') startMove(0, 1);
   if (event.code === 'ArrowDown' || event.code === 'KeyS') startMove(0, -1);
-
-  // Correção pedida: D para direita e A para esquerda, respeitando a perspetiva atual.
-  if (event.code === 'ArrowLeft' || event.code === 'KeyA') startMove(1, 0);
-  if (event.code === 'ArrowRight' || event.code === 'KeyD') startMove(-1, 0);
+  if (event.code === 'ArrowLeft' || event.code === 'KeyA') startMove(-1, 0);
+  if (event.code === 'ArrowRight' || event.code === 'KeyD') startMove(1, 0);
 });
 
-function resetGame() {
+window.addEventListener('keyup', (event) => keys.delete(event.code));
+
+restartBtn.addEventListener('click', () => {
   alive = true;
   statusEl.textContent = 'Pronto para jogar';
   restartBtn.hidden = true;
   player.position.set(0, 0, 0);
   targetX = 0;
   targetLane = 0;
-  moving = false;
-  moveProgress = 0;
   maxLaneReached = 0;
   scoreEl.textContent = '0';
-}
-
-restartBtn.addEventListener('click', resetGame);
+});
 
 const clock = new THREE.Clock();
 
-function wrapMover(mover) {
-  if (mover.mesh.position.x > HALF_WIDTH + 8) mover.mesh.position.x = -HALF_WIDTH - 8;
-  if (mover.mesh.position.x < -HALF_WIDTH - 8) mover.mesh.position.x = HALF_WIDTH + 8;
-}
+function updateCars(dt) {
+  for (const car of cars) {
+    car.mesh.position.x += car.speed * dt;
 
-function currentLaneIndex() {
-  return Math.round(player.position.z / LANE_SIZE);
-}
+    if (car.mesh.position.x > HALF_WIDTH + 6) car.mesh.position.x = -HALF_WIDTH - 6;
+    if (car.mesh.position.x < -HALF_WIDTH - 6) car.mesh.position.x = HALF_WIDTH + 6;
 
-function detectCollisionAndWater(dt) {
-  const lane = lanes.get(currentLaneIndex());
-  if (!lane || !alive) return;
-
-  if (lane.type === 'road') {
-    for (const car of lane.movers) {
-      if (Math.abs(car.mesh.position.x - player.position.x) < car.halfX + 0.55 && Math.abs(car.mesh.position.z - player.position.z) < 1.3) {
-        alive = false;
-        statusEl.textContent = 'Fim de jogo! Foste atropelado.';
-        restartBtn.hidden = false;
-        return;
-      }
-    }
-  }
-
-  if (lane.type === 'water') {
-    let onLog = false;
-    for (const log of lane.movers) {
-      const withinX = Math.abs(log.mesh.position.x - player.position.x) < log.halfX - 0.15;
-      if (withinX && Math.abs(log.mesh.position.z - player.position.z) < 1.4) {
-        onLog = true;
-        if (!moving) {
-          player.position.x += log.speed * dt;
-          targetX = player.position.x;
-        }
-        break;
-      }
-    }
-
-    if (!onLog && !moving) {
+    if (alive && Math.abs(car.mesh.position.z - player.position.z) < 1.2 && Math.abs(car.mesh.position.x - player.position.x) < 1.8) {
       alive = false;
-      statusEl.textContent = 'Fim de jogo! Caíste na água.';
+      statusEl.textContent = 'Fim de jogo! Foste atropelado.';
       restartBtn.hidden = false;
-      return;
-    }
-
-    if (Math.abs(player.position.x) > HALF_WIDTH - 1.4) {
-      alive = false;
-      statusEl.textContent = 'Fim de jogo! Foste levado pela corrente.';
-      restartBtn.hidden = false;
-    }
-  }
-}
-
-function updateLanesAndMovers(dt) {
-  const laneNow = currentLaneIndex();
-  ensureLanesAround(laneNow);
-
-  for (const lane of lanes.values()) {
-    for (const mover of lane.movers) {
-      mover.mesh.position.x += mover.speed * dt;
-      wrapMover(mover);
     }
   }
 }
@@ -299,7 +192,7 @@ function updateMovement(dt) {
 
   moveProgress += dt / MOVE_TIME;
   const t = Math.min(moveProgress, 1);
-  const jump = Math.sin(Math.PI * t) * 0.9;
+  const jump = Math.sin(Math.PI * t) * 0.85;
 
   player.position.lerpVectors(startPos, endPos, t);
   player.position.y = jump;
@@ -312,6 +205,13 @@ function updateMovement(dt) {
       maxLaneReached = targetLane;
       scoreEl.textContent = String(maxLaneReached);
       statusEl.textContent = 'Continua!';
+    }
+
+    const lane = lanes[targetLane];
+    if (lane?.userData.type === 'water') {
+      alive = false;
+      statusEl.textContent = 'Fim de jogo! Caíste na água.';
+      restartBtn.hidden = false;
     }
   }
 }
@@ -327,14 +227,10 @@ function animate() {
   requestAnimationFrame(animate);
 
   const dt = Math.min(clock.getDelta(), 0.03);
-
-  if (alive) {
-    updateMovement(dt);
-    updateLanesAndMovers(dt);
-    detectCollisionAndWater(dt);
-  }
-
+  updateCars(dt);
+  if (alive) updateMovement(dt);
   updateCamera();
+
   renderer.render(scene, camera);
 }
 
