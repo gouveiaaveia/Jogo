@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Crossy Road 3D</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <canvas id="game"></canvas>
+
+    <div id="hud" class="hud hidden">
+      <p>Pontuação: <span id="score">0</span></p>
+      <p id="status">Boa sorte!</p>
+    </div>
+
+    <div id="start-menu" class="overlay">
+      <div class="panel">
+        <h1>Crossy Road 3D</h1>
+        <p>WASD ou setas para mover.</p>
+        <p>Atravessa estradas, água e usa pontes para sobreviver.</p>
+        <button id="start-btn">Começar Jogo</button>
+      </div>
+    </div>
+
+    <div id="gameover-menu" class="overlay hidden">
+      <div class="panel">
+        <h2>Game Over</h2>
+        <p>Pontuação final: <span id="final-score">0</span></p>
+        <button id="restart-btn">Recomeçar</button>
+      </div>
+    </div>
+
+    <script type="module" src="game.js"></script>
+  </body>
+</html>
